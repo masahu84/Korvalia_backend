@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Property {
+  id           Int              @id @default(autoincrement())
+  title        String
+  slug         String           @unique
+  description  String
+  operation    OperationType
+  propertyType PropertyCategory
+  price        Int
+  currency     String           @default("EUR")
+  cityId       Int
+  neighborhood String?
+  address      String
+  latitude     Float?
+  longitude    Float?
+  bedrooms     Int?
+  bathrooms    Int?
+  areaM2       Int?
+  builtYear    Int?
+  floor        Int?
+  hasElevator  Boolean?
+  hasParking   Boolean?
+  hasPool      Boolean?
+  hasTerrace   Boolean?
+  hasGarden    Boolean?
+  furnished    Boolean?
+  petsAllowed  Boolean?
+  energyRating String?
+  status       PropertyStatus   @default(ACTIVE)
+  isFeatured   Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  city         City             @relation(fields: [cityId], references: [id])
+  images       PropertyImage[]
+
+  @@index([cityId])
+  @@index([operation])
+  @@index([propertyType])
+  @@index([status])
+  @@index([isFeatured])
+}
+
+model PropertyImage {
+  id         Int      @id @default(autoincrement())
+  url        String
+  alt        String?
+  order      Int      @default(0)
+  isPrimary  Boolean  @default(false)
+  propertyId Int
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([order])
+  @@index([isPrimary])
+}
+
+model City {
+  id         Int        @id @default(autoincrement())
+  name       String
+  slug       String     @unique
+  province   String?
+  active     Boolean    @default(true)
+  latitude   Float?
+  longitude  Float?
+  properties Property[]
+
+  @@index([slug])
+  @@index([active])
+}
+
+model CompanySettings {
+  id             Int      @id @default(autoincrement())
+
+  // Logo del navbar
+  logoUrl        String?
+
+  // Hero (Portada)
+  heroTitle      String   @default("Bienvenido a nuestra inmobiliaria")
+  heroSubtitle   String   @default("Encuentra la propiedad de tus sueños")
+  heroImages     String[] @default([])
+
+  // Datos de contacto (Footer)
+  companyName    String?
+  slogan         String?
+  phone          String?
+  email          String?
+  address        String?
+
+  // Redes sociales
+  instagramUrl   String?
+  facebookUrl    String?
+  linkedinUrl    String?
+  whatsappNumber String?
+
+  // Enlaces legales
+  legalNoticeUrl    String?
+  privacyPolicyUrl  String?
+  cookiesPolicyUrl  String?
+
+  // Horario
+  schedule       String?
+
+  // Descripción de la empresa
+  aboutUs        String?  @db.Text
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+}
+
+model AdminUser {
+  id       Int     @id @default(autoincrement())
+  name     String
+  email    String  @unique
+  password String
+  isSuper  Boolean @default(false)
+
+  @@index([email])
+}
+
+model HeroImage {
+  id        Int      @id @default(autoincrement())
+  url       String
+  order     Int
+  active    Boolean  @default(true)
+  pageKey   String   @default("home")
+  createdAt DateTime @default(now())
+
+  @@index([order])
+  @@index([active])
+  @@index([pageKey])
+}
+
+model PageSettings {
+  id                Int      @id @default(autoincrement())
+  pageKey           String   @unique
+  title             String?
+  subtitle          String?
+  metaTitle         String?
+  metaDescription   String?
+  blocks            Json?
+
+  // Testimonial (solo para home)
+  testimonialName   String?
+  testimonialRole   String?
+  testimonialText   String?  @db.Text
+  testimonialImage  String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([pageKey])
+}
+
+model Lead {
+  id          Int      @id @default(autoincrement())
+  email       String
+  source      String   @default("cta_home") // De dónde viene el lead
+  status      LeadStatus @default(NEW)
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CONVERTED
+  LOST
+}
+
+enum OperationType {
+  RENT
+  SALE
+}
+
+enum PropertyCategory {
+  FLAT
+  APARTMENT
+  HOUSE
+  PENTHOUSE
+  DUPLEX
+  LAND
+  COMMERCIAL
+  GARAGE
+  ROOM
+  OTHER
+}
+
+enum PropertyStatus {
+  ACTIVE
+  INACTIVE
+  RESERVED
+  SOLD
+  RENTED
+}
