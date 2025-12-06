@@ -14,7 +14,13 @@ const app: Application = express();
 // Configurar CORS para permitir peticiones desde el frontend
 app.use(
   cors({
-    origin: ["http://localhost:4321", "http://localhost:3000", "http://194.164.72.117"],
+    origin: [
+      "http://localhost:4321",
+      "http://localhost:4322",
+      "http://localhost:4323",
+      "http://localhost:3000",
+      "http://194.164.72.117",
+    ],
     credentials: true,
   })
 );
