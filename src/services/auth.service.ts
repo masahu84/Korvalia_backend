@@ -103,7 +103,7 @@ function generateToken(payload: TokenPayload): string {
     throw new Error('JWT_SECRET no está configurado');
   }
 
-  const expiresIn: string = process.env.JWT_EXPIRES_IN || '7d';
+  const expiresIn: string = process.env.JWT_EXPIRES_IN || '1d';
   return jwt.sign(payload, jwtSecret, { expiresIn } as jwt.SignOptions);
 }
 
