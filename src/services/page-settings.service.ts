@@ -30,27 +30,25 @@ function validatePageKey(pageKey: string): PageKey {
 
 /**
  * Obtiene la configuración de una página
+ * Usa upsert para evitar race conditions con unique constraint
  */
 export async function getPageSettings(pageKey: string) {
   const validPageKey = validatePageKey(pageKey);
 
-  let pageSettings = await prisma.pageSettings.findUnique({
+  // Usar upsert para evitar race condition cuando múltiples requests
+  // intentan crear el mismo pageKey simultáneamente
+  const pageSettings = await prisma.pageSettings.upsert({
     where: { pageKey: validPageKey },
+    update: {}, // No actualizar nada si ya existe
+    create: {
+      pageKey: validPageKey,
+      title: '',
+      subtitle: '',
+      metaTitle: '',
+      metaDescription: '',
+      blocks: {},
+    },
   });
-
-  // Si no existe, crear una entrada por defecto
-  if (!pageSettings) {
-    pageSettings = await prisma.pageSettings.create({
-      data: {
-        pageKey: validPageKey,
-        title: '',
-        subtitle: '',
-        metaTitle: '',
-        metaDescription: '',
-        blocks: {},
-      },
-    });
-  }
 
   return pageSettings;
 }
