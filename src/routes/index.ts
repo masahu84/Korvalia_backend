@@ -8,6 +8,7 @@ import heroImagesRoutes from './hero-images.routes';
 import pageSettingsRoutes from './page-settings.routes';
 import leadRoutes from './lead.routes';
 import contactRoutes from './contact.routes';
+import chatbotRoutes from './chatbot.routes';
 
 const router = Router();
 
@@ -35,5 +36,6 @@ router.use('/hero-images', heroImagesRoutes);
 router.use('/pages', pageSettingsRoutes);
 router.use('/leads', leadRoutes);
 router.use('/contact', contactRoutes);
+router.use('/chat', chatbotRoutes);
 
 export default router;

@@ -206,3 +206,51 @@ enum PropertyStatus {
   SOLD
   RENTED
 }
+
+// ============================================
+// CHATBOT - Conversaciones y Leads
+// ============================================
+
+model ChatConversation {
+  id           String        @id @default(uuid())
+  sessionId    String        @unique // ID de sesión del navegador
+  visitorName  String?
+  visitorEmail String?
+  visitorPhone String?
+  propertyId   Int?          // Propiedad de interés (si aplica)
+  status       ChatStatus    @default(ACTIVE)
+  source       String        @default("widget") // widget, property_page, etc.
+  messages     ChatMessage[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([sessionId])
+  @@index([visitorEmail])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ChatMessage {
+  id             Int              @id @default(autoincrement())
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           MessageRole      // USER o BOT
+  content        String           @db.Text
+  metadata       Json?            // Datos adicionales (propiedades sugeridas, etc.)
+  createdAt      DateTime         @default(now())
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+enum ChatStatus {
+  ACTIVE        // Conversación en curso
+  LEAD_CAPTURED // Se capturó información de contacto
+  CLOSED        // Cerrada por el usuario
+  ESCALATED     // Escalada a agente humano
+}
+
+enum MessageRole {
+  USER
+  BOT
+}
