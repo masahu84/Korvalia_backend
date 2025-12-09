@@ -22,6 +22,8 @@ app.use(
       "http://localhost:4325",
       "http://localhost:3000",
       "http://194.164.72.117",
+      "http://www.korvalia.es",
+      "http://korvalia.es",
     ],
     credentials: true,
   })
