@@ -24,6 +24,8 @@ app.use(
       "http://194.164.72.117",
       "http://www.korvalia.es",
       "http://korvalia.es",
+      "https://www.korvalia.es",
+      "https://korvalia.es",
     ],
     credentials: true,
   })
