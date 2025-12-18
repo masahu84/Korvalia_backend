@@ -1,51 +1,54 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import * as leadService from '../services/lead.service';
-import * as emailService from '../services/email.service';
-import * as settingsService from '../services/settings.service';
 import { authMiddleware } from '../middlewares/auth.middleware';
 
 const router = Router();
 
 /**
  * POST /api/leads
- * Crea un nuevo lead (público, no requiere autenticación)
+ * Crea un nuevo lead con email (público, no requiere autenticación)
+ * Solo guarda en base de datos
  */
 router.post(
   '/',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-    const { email, source } = req.body;
+      const { email, source } = req.body;
 
-    // Crear lead en la base de datos
-    const lead = await leadService.createLead({ email, source });
+      // Crear lead en la base de datos
+      const lead = await leadService.createLead({ email, source });
 
-    // Obtener datos de la empresa para el email
-    const settings = await settingsService.getSettings();
-
-    // Preparar emails (por ahora solo se registran en consola)
-    if (settings.email && settings.companyName) {
-      // Email de bienvenida al usuario
-      await emailService.sendWelcomeEmail(email, {
-        companyName: settings.companyName || 'Korvalia',
-        email: settings.email || '',
-        phone: settings.phone || '',
-        address: settings.address || '',
-        whatsappNumber: settings.whatsappNumber || '',
+      res.status(201).json({
+        success: true,
+        message: '¡Gracias por tu interés! Pronto te contactaremos.',
+        data: lead,
       });
-
-      // Notificación a la empresa
-      await emailService.sendLeadNotificationToCompany(
-        settings.email,
-        email,
-        source || 'cta_home'
-      );
+    } catch (error) {
+      next(error);
     }
+  }
+);
 
-    res.status(201).json({
-      success: true,
-      message: '¡Gracias por tu interés! Pronto te contactaremos.',
-      data: lead,
-    });
+/**
+ * POST /api/leads/phone
+ * Crea un nuevo lead con teléfono (para el CTA)
+ * Solo guarda en base de datos, se visualiza desde el panel admin
+ */
+router.post(
+  '/phone',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { phone, source = 'cta_home' } = req.body;
+
+      // Crear lead en la base de datos
+      const lead = await leadService.createPhoneLead(phone, source);
+
+      // Responder al usuario
+      res.status(201).json({
+        success: true,
+        message: '¡Gracias! Te llamaremos lo antes posible.',
+        data: lead,
+      });
     } catch (error) {
       next(error);
     }

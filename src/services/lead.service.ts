@@ -2,7 +2,8 @@ import prisma from '../prisma/client';
 import { throwValidationError } from '../middlewares/error.middleware';
 
 export interface CreateLeadData {
-  email: string;
+  email?: string;
+  phone?: string;
   source?: string;
 }
 
@@ -15,23 +16,92 @@ function validateEmail(email: string): boolean {
 }
 
 /**
- * Crea un nuevo lead
+ * Valida un teléfono español (9 dígitos, puede empezar con +34)
+ */
+function validatePhone(phone: string): boolean {
+  // Eliminar espacios y guiones
+  const cleanPhone = phone.replace(/[\s\-]/g, '');
+  // Aceptar formatos: 612345678, +34612345678, 0034612345678
+  const phoneRegex = /^(\+34|0034)?[6789]\d{8}$/;
+  return phoneRegex.test(cleanPhone);
+}
+
+/**
+ * Crea un nuevo lead (puede ser por email o por teléfono)
  */
 export async function createLead(data: CreateLeadData) {
-  const { email, source = 'cta_home' } = data;
+  const { email, phone, source = 'cta_home' } = data;
 
-  // Validar email
-  if (!email || !validateEmail(email)) {
+  // Debe tener al menos email o teléfono
+  if (!email && !phone) {
+    throwValidationError({ contact: 'Debes proporcionar un email o teléfono' });
+  }
+
+  // Validar email si se proporciona
+  if (email && !validateEmail(email)) {
     throwValidationError({ email: 'Email inválido' });
   }
 
-  // Verificar si el email ya existe
+  // Validar teléfono si se proporciona
+  if (phone && !validatePhone(phone)) {
+    throwValidationError({ phone: 'Teléfono inválido. Introduce un número español válido.' });
+  }
+
+  // Normalizar datos
+  const normalizedEmail = email ? email.toLowerCase().trim() : null;
+  const normalizedPhone = phone ? phone.replace(/[\s\-]/g, '') : null;
+
+  // Verificar si ya existe un lead con ese email o teléfono
   const existingLead = await prisma.lead.findFirst({
-    where: { email: email.toLowerCase().trim() },
+    where: {
+      OR: [
+        ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
+        ...(normalizedPhone ? [{ phone: normalizedPhone }] : []),
+      ],
+    },
   });
 
   if (existingLead) {
-    // Si ya existe, actualizar la fecha
+    // Si ya existe, actualizar la fecha y añadir el campo que faltaba
+    return prisma.lead.update({
+      where: { id: existingLead.id },
+      data: {
+        updatedAt: new Date(),
+        ...(normalizedEmail && !existingLead.email ? { email: normalizedEmail } : {}),
+        ...(normalizedPhone && !existingLead.phone ? { phone: normalizedPhone } : {}),
+      },
+    });
+  }
+
+  // Crear nuevo lead
+  return prisma.lead.create({
+    data: {
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      source,
+      status: 'NEW',
+    },
+  });
+}
+
+/**
+ * Crea un lead solo con teléfono (para el CTA)
+ */
+export async function createPhoneLead(phone: string, source: string = 'cta_home') {
+  // Validar teléfono
+  if (!phone || !validatePhone(phone)) {
+    throwValidationError({ phone: 'Teléfono inválido. Introduce un número español válido.' });
+  }
+
+  const normalizedPhone = phone.replace(/[\s\-]/g, '');
+
+  // Verificar si ya existe
+  const existingLead = await prisma.lead.findFirst({
+    where: { phone: normalizedPhone },
+  });
+
+  if (existingLead) {
+    // Actualizar fecha
     return prisma.lead.update({
       where: { id: existingLead.id },
       data: { updatedAt: new Date() },
@@ -41,7 +111,7 @@ export async function createLead(data: CreateLeadData) {
   // Crear nuevo lead
   return prisma.lead.create({
     data: {
-      email: email.toLowerCase().trim(),
+      phone: normalizedPhone,
       source,
       status: 'NEW',
     },

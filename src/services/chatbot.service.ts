@@ -1,10 +1,11 @@
 /**
  * Servicio del Chatbot de Korvalia
- * Chatbot híbrido para inmobiliaria - Detección de intenciones + Búsqueda en BD
+ * Chatbot híbrido para inmobiliaria - Detección de intenciones + Búsqueda en Emblematic
  */
 
 import prisma from '../prisma/client';
 import { ChatStatus } from '../generated/prisma/client';
+import * as emblematicService from './emblematic.service';
 
 // Tipos
 interface ChatResponse {
@@ -289,77 +290,129 @@ function extractContactInfo(message: string): { email?: string; phone?: string; 
 }
 
 // ============================================
-// BÚSQUEDA DE PROPIEDADES
+// BÚSQUEDA DE PROPIEDADES (usando Emblematic)
 // ============================================
 
 /**
- * Buscar propiedades según parámetros
+ * Mapear tipo de propiedad interno a subtipo de Emblematic
  */
-async function searchProperties(params: PropertySearchParams, limit: number = 3): Promise<any[]> {
-  const where: any = { status: 'ACTIVE' };
-
-  if (params.operation) where.operation = params.operation;
-  if (params.propertyType) where.propertyType = params.propertyType;
-  if (params.bedrooms) where.bedrooms = { gte: params.bedrooms };
-
-  if (params.minPrice || params.maxPrice) {
-    where.price = {};
-    if (params.minPrice) where.price.gte = params.minPrice;
-    if (params.maxPrice) where.price.lte = params.maxPrice;
-  }
-
-  const properties = await prisma.property.findMany({
-    where,
-    take: limit,
-    orderBy: [{ isFeatured: 'desc' }, { createdAt: 'desc' }],
-    include: {
-      city: true,
-      images: { where: { isPrimary: true }, take: 1 },
-    },
-  });
-
-  return properties.map(p => ({
-    id: p.id,
-    title: p.title,
-    slug: p.slug,
-    price: p.price,
-    operation: p.operation,
-    propertyType: p.propertyType,
-    bedrooms: p.bedrooms,
-    bathrooms: p.bathrooms,
-    areaM2: p.areaM2,
-    city: p.city.name,
-    image: p.images[0]?.url || null,
-  }));
+function mapPropertyTypeToEmblematic(type: string | undefined): number | undefined {
+  if (!type) return undefined;
+  const mapping: Record<string, number> = {
+    'FLAT': 46458,        // Piso
+    'APARTMENT': 46449,   // Apartamento
+    'HOUSE': 46452,       // Casa
+    'PENTHOUSE': 46450,   // Ático
+    'DUPLEX': 46455,      // Dúplex
+    'LAND': 46498,        // Solar
+    'COMMERCIAL': 46484,  // Local comercial
+    'GARAGE': 46468,      // Garaje
+  };
+  return mapping[type];
 }
 
 /**
- * Obtener propiedades destacadas
+ * Mapear operación a mode_id de Emblematic
+ */
+function mapOperationToEmblematic(operation: string | undefined): number | undefined {
+  if (!operation) return undefined;
+  const mapping: Record<string, number> = {
+    'RENT': 2,   // Alquiler
+    'SALE': 1,   // Venta
+  };
+  return mapping[operation];
+}
+
+/**
+ * Buscar propiedades en Emblematic según parámetros
+ */
+async function searchProperties(params: PropertySearchParams, limit: number = 3): Promise<any[]> {
+  try {
+    const emblematicParams: any = { page: 1 };
+
+    // Mapear operación (Venta/Alquiler)
+    const modeId = mapOperationToEmblematic(params.operation);
+    if (modeId) emblematicParams.mode_id = modeId;
+
+    // Mapear tipo de propiedad a subtipo
+    const subtypeId = mapPropertyTypeToEmblematic(params.propertyType);
+    if (subtypeId) emblematicParams.subtype_id = subtypeId;
+
+    // Filtros de precio
+    if (params.minPrice) emblematicParams.feature_price_from = params.minPrice;
+    if (params.maxPrice) emblematicParams.feature_price_to = params.maxPrice;
+
+    // Habitaciones
+    if (params.bedrooms) emblematicParams.rooms = params.bedrooms;
+
+    const data = await emblematicService.getProperties(emblematicParams);
+
+    // Limitar resultados
+    const properties = (data.properties || []).slice(0, limit);
+
+    // Formatear para el chatbot
+    return properties.map(p => ({
+      id: p.reference,
+      reference: p.reference,
+      title: p.title,
+      slug: p.slug,
+      price: p.price,
+      operation: p.operation,
+      propertyType: p.propertySubtype || p.propertyType,
+      bedrooms: p.rooms,
+      bathrooms: p.bathrooms,
+      areaM2: p.area || p.areaBuilt,
+      city: p.city,
+      image: p.images?.[0] || null,
+      canonicalUrl: p.canonicalUrl,
+    }));
+  } catch (error) {
+    console.error('[Chatbot] Error buscando propiedades en Emblematic:', error);
+    return [];
+  }
+}
+
+/**
+ * Obtener propiedades destacadas de Emblematic
  */
 async function getFeaturedProperties(limit: number = 3): Promise<any[]> {
-  const properties = await prisma.property.findMany({
-    where: { status: 'ACTIVE', isFeatured: true },
-    take: limit,
-    orderBy: { createdAt: 'desc' },
-    include: {
-      city: true,
-      images: { where: { isPrimary: true }, take: 1 },
-    },
-  });
+  try {
+    const data = await emblematicService.getFeaturedProperties();
 
-  return properties.map(p => ({
-    id: p.id,
-    title: p.title,
-    slug: p.slug,
-    price: p.price,
-    operation: p.operation,
-    propertyType: p.propertyType,
-    bedrooms: p.bedrooms,
-    bathrooms: p.bathrooms,
-    areaM2: p.areaM2,
-    city: p.city.name,
-    image: p.images[0]?.url || null,
-  }));
+    // Combinar featured y latest, priorizando featured
+    let properties = [...(data.featured || []), ...(data.latest || [])];
+
+    // Eliminar duplicados por referencia
+    const seen = new Set();
+    properties = properties.filter(p => {
+      if (seen.has(p.reference)) return false;
+      seen.add(p.reference);
+      return true;
+    });
+
+    // Limitar resultados
+    properties = properties.slice(0, limit);
+
+    // Formatear para el chatbot
+    return properties.map(p => ({
+      id: p.reference,
+      reference: p.reference,
+      title: p.title,
+      slug: p.slug,
+      price: p.price,
+      operation: p.operation,
+      propertyType: p.propertySubtype || p.propertyType,
+      bedrooms: p.rooms,
+      bathrooms: p.bathrooms,
+      areaM2: p.area || p.areaBuilt,
+      city: p.city,
+      image: p.images?.[0] || null,
+      canonicalUrl: p.canonicalUrl,
+    }));
+  } catch (error) {
+    console.error('[Chatbot] Error obteniendo propiedades destacadas de Emblematic:', error);
+    return [];
+  }
 }
 
 /**

@@ -9,6 +9,7 @@ import pageSettingsRoutes from './page-settings.routes';
 import leadRoutes from './lead.routes';
 import contactRoutes from './contact.routes';
 import chatbotRoutes from './chatbot.routes';
+import emblematicRoutes from './emblematic.routes';
 
 const router = Router();
 
@@ -37,5 +38,6 @@ router.use('/pages', pageSettingsRoutes);
 router.use('/leads', leadRoutes);
 router.use('/contact', contactRoutes);
 router.use('/chat', chatbotRoutes);
+router.use('/emblematic', emblematicRoutes);
 
 export default router;

@@ -161,7 +161,8 @@ model PageSettings {
 
 model Lead {
   id          Int      @id @default(autoincrement())
-  email       String
+  email       String?
+  phone       String?  // Número de teléfono del lead
   source      String   @default("cta_home") // De dónde viene el lead
   status      LeadStatus @default(NEW)
   notes       String?  @db.Text
@@ -169,6 +170,7 @@ model Lead {
   updatedAt   DateTime @updatedAt
 
   @@index([email])
+  @@index([phone])
   @@index([status])
   @@index([createdAt])
 }
