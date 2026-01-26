@@ -231,10 +231,40 @@ function extractArea(features: any): { area?: number; areaBuilt?: number; areaPl
 function extractImageUrls(images: any): string[] {
   if (!images || !Array.isArray(images)) return [];
   return images.map((img: any) => {
+    if (!img) return '';
     if (typeof img === 'string') return img;
     // Preferir thumb_800_600 para mejor rendimiento, o url original
     return img.thumb_800_600 || img.url || img.original || '';
   }).filter(Boolean);
+}
+
+/**
+ * Extrae URLs de videos del formato de Emblematic
+ */
+function extractVideoUrls(videos: any): string[] {
+  if (!videos) return [];
+
+  if (Array.isArray(videos)) {
+    return videos.map((v: any) => {
+      if (!v) return '';
+      if (typeof v === 'string') return v;
+      // Intentar extraer URL de diferentes formatos posibles
+      return v.url || v.video_url || v.src || v.link || '';
+    }).filter(Boolean);
+  }
+
+  // Si es un objeto único (y no null)
+  if (videos && typeof videos === 'object') {
+    const url = videos.url || videos.video_url || videos.src || videos.link;
+    return url ? [url] : [];
+  }
+
+  // Si es string directo
+  if (typeof videos === 'string') {
+    return [videos];
+  }
+
+  return [];
 }
 
 /**
@@ -375,6 +405,7 @@ function normalizeOffer(offer: EmblematicOffer): EmblematicPropertyNormalized {
     images: extractImageUrls(offer.images),
     virtualTour: offer.virtual_tour,
     videosCount: Array.isArray(offer.videos) ? offer.videos.length : (extractNumericValue(offer.videos) || 0),
+    videos: extractVideoUrls(offer.videos),
 
     // Flags
     isVPO: offer.is_vpo === true,

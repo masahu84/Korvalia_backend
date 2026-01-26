@@ -108,7 +108,7 @@ export interface EmblematicOffer {
   longitude: number;
   images: string[];
   virtual_tour: string;
-  videos: number;
+  videos: number | any[];  // Puede ser contador numérico o array de videos
   features: number | EmblematicOfferFeatures;
   address: EmblematicAddress[];
   energy_efficiency_certificate: string;
@@ -265,6 +265,7 @@ export interface EmblematicPropertyNormalized {
   images: string[];
   virtualTour?: string;
   videosCount: number;
+  videos: string[];
 
   // Flags
   isVPO: boolean;
